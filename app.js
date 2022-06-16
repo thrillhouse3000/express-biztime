@@ -12,7 +12,7 @@ app.use('/companies', companiesRoutes)
 app.use('/invoices', invoicesRoutes)
 
 
-app.use(function(req, res, next) {
+app.use((req, res, next) => {
   const err = new ExpressError("Not Found", 404);
   return next(err);
 });
