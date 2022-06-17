@@ -4,6 +4,27 @@ const request = require('supertest');
 const app = require('../app');
 const db = require('../db');
 
+beforeAll(async () => {
+    await db.query(`DROP TABLE IF EXISTS companies_industries`)
+    await db.query(`DROP TABLE IF EXISTS invoices`)
+    await db.query(`DROP TABLE IF EXISTS companies`)
+    await db.query(`DROP TABLE IF EXISTS industries`)
+    await db.query(`CREATE TABLE companies (
+        code text PRIMARY KEY,
+        name text NOT NULL UNIQUE,
+        description text
+    )`)
+    await db.query(`CREATE TABLE invoices (
+        id serial PRIMARY KEY,
+        comp_code text NOT NULL REFERENCES companies ON DELETE CASCADE,
+        amt float NOT NULL,
+        paid boolean DEFAULT false NOT NULL,
+        add_date date DEFAULT CURRENT_DATE NOT NULL,
+        paid_date date,
+        CONSTRAINT invoices_amt_check CHECK ((amt > (0)::double precision))
+    )`)
+})
+
 //create some data before each test
 beforeEach(async () => {
     const company = await db.query(`INSERT INTO companies (code, name, description) VALUES ('test', 'TestCom', 'A test company') RETURNING code, name, description`);
@@ -70,14 +91,42 @@ describe('POST /invoices', () => {
 })
 
 describe('PUT /invoices/:id', () => {
-    test("Update an invoice by it's id", async () => {
-        const res = await request(app).put(`/invoices/${testInvoice.id}`).send({amt: 333})
+    test("Pay off an invoice by it's id", async () => {
+        const res = await request(app).put(`/invoices/${testInvoice.id}`).send({amt: 333, paid: true})
         expect(res.statusCode).toBe(200)
         expect(res.body).toEqual({invoice:
             {
                 id: expect.any(Number),
                 comp_code: 'test',
                 amt: 333,
+                paid: true,
+                add_date: expect.any(String),
+                paid_date: expect.any(String)
+            }
+        })
+    })
+    test("Unpay an invoice by it's id", async () => {
+        const res = await request(app).put(`/invoices/${testInvoice.id}`).send({amt: 333, paid: false})
+        expect(res.statusCode).toBe(200)
+        expect(res.body).toEqual({invoice:
+            {
+                id: expect.any(Number),
+                comp_code: 'test',
+                amt: 333,
+                paid: false,
+                add_date: expect.any(String),
+                paid_date: null
+            }
+        })
+    })
+    test("Pay an invoice amount by it's id", async () => {
+        const res = await request(app).put(`/invoices/${testInvoice.id}`).send({amt: 444, paid: false})
+        expect(res.statusCode).toBe(200)
+        expect(res.body).toEqual({invoice:
+            {
+                id: expect.any(Number),
+                comp_code: 'test',
+                amt: 444,
                 paid: false,
                 add_date: expect.any(String),
                 paid_date: null
